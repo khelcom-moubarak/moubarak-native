@@ -31,17 +31,19 @@ jobs:
       - name: Mettre l'icône MOUBARAK
         run: |
           curl -fsSL https://khm.khelcom-moubarak.workers.dev/icon-512.png -o icon.png
+          curl -fsSL https://khm.khelcom-moubarak.workers.dev/icon-maskable-512.png -o icon-maskable.png
           pip install pillow
           python3 - <<'PY'
           from PIL import Image
-          import glob, os
-          im = Image.open("icon.png").convert("RGBA")
+          res = "android/app/src/main/res/"
+          leg = Image.open("icon.png").convert("RGBA")
+          fg = Image.open("icon-maskable.png").convert("RGBA")
           for d, s in {"mdpi": 48, "hdpi": 72, "xhdpi": 96, "xxhdpi": 144, "xxxhdpi": 192}.items():
-              p = "android/app/src/main/res/mipmap-" + d
+              p = res + "mipmap-" + d
               for n in ("ic_launcher.png", "ic_launcher_round.png"):
-                  im.resize((s, s), Image.LANCZOS).save(os.path.join(p, n))
-          for f in glob.glob("android/app/src/main/res/mipmap-anydpi-v26/*.xml"):
-              os.remove(f)
+                  leg.resize((s, s), Image.LANCZOS).save(p + "/" + n)
+              f = s * 9 // 4
+              fg.resize((f, f), Image.LANCZOS).save(p + "/ic_launcher_foreground.png")
           PY
       - name: Synchroniser
         run: npx cap sync android
