@@ -1,0 +1,9 @@
+{
+  "appId": "barakah.khelcom.moubarak",
+  "appName": "MOUBARAK",
+  "webDir": "www",
+  "server": {
+    "url": "https://khm.khelcom-moubarak.workers.dev",
+    "androidScheme": "https"
+  }
+}
