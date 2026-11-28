@@ -1,4 +1,4 @@
-name: Fabriquer l'APK MOUBARAK (v5)
+name: Fabriquer l'APK MOUBARAK (v6)
 
 on:
   workflow_dispatch:
@@ -28,15 +28,6 @@ jobs:
             "server": {
               "url": "https://khm.khelcom-moubarak.workers.dev",
               "androidScheme": "https"
-            },
-            "plugins": {
-              "SplashScreen": {
-                "launchAutoHide": true,
-                "launchShowDuration": 6000,
-                "launchFadeOutDuration": 150,
-                "backgroundColor": "#0c5d3b",
-                "showSpinner": false
-              }
             }
           }
           JSON
@@ -49,6 +40,130 @@ jobs:
           cp native/MoubarakMediaPlugin.java $D/
           cp native/MainActivity.java $D/
           sed -i 's#</manifest>#    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="28" />\n</manifest>#' android/app/src/main/AndroidManifest.xml
+      - name: Ecran de demarrage natif (reste affiche jusqu'a ce que le site soit pret)
+        run: |
+          D=android/app/src/main/java/barakah/khelcom/moubarak
+          cat > $D/MainActivity.java <<'JAVA'
+          package barakah.khelcom.moubarak;
+
+          import android.content.Context;
+          import android.graphics.Canvas;
+          import android.graphics.Paint;
+          import android.graphics.Path;
+          import android.graphics.Typeface;
+          import android.os.Bundle;
+          import android.os.Handler;
+          import android.os.Looper;
+          import android.view.View;
+          import android.view.ViewGroup;
+          import com.getcapacitor.BridgeActivity;
+          import com.getcapacitor.Plugin;
+          import com.getcapacitor.PluginCall;
+          import com.getcapacitor.PluginMethod;
+          import com.getcapacitor.annotation.CapacitorPlugin;
+
+          public class MainActivity extends BridgeActivity {
+              private SplashView splash;
+              private boolean splashGone = false;
+
+              @Override
+              public void onCreate(Bundle savedInstanceState) {
+                  registerPlugin(MoubarakMediaPlugin.class);
+                  registerPlugin(MoubarakSplashPlugin.class);
+                  super.onCreate(savedInstanceState);
+                  splash = new SplashView(this);
+                  addContentView(splash, new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+                  new Handler(Looper.getMainLooper()).postDelayed(new Runnable() {
+                      public void run() { hideSplash(); }
+                  }, 8000);
+              }
+
+              public void hideSplash() {
+                  if (splashGone || splash == null) return;
+                  splashGone = true;
+                  final View v = splash;
+                  v.animate().alpha(0f).setDuration(150).withEndAction(new Runnable() {
+                      public void run() {
+                          ViewGroup p = (ViewGroup) v.getParent();
+                          if (p != null) p.removeView(v);
+                      }
+                  }).start();
+              }
+
+              @CapacitorPlugin(name = "MoubarakSplash")
+              public static class MoubarakSplashPlugin extends Plugin {
+                  @PluginMethod
+                  public void hide(final PluginCall call) {
+                      final MainActivity a = (MainActivity) getActivity();
+                      if (a == null) { call.resolve(); return; }
+                      a.runOnUiThread(new Runnable() {
+                          public void run() {
+                              a.hideSplash();
+                              call.resolve();
+                          }
+                      });
+                  }
+              }
+
+              /* Meme dessin que le premier affichage de l'ecran vert du site : rond blanc, M vert, MOUBARAK */
+              private static class SplashView extends View {
+                  private final Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
+                  private final float d;
+
+                  SplashView(Context c) {
+                      super(c);
+                      d = c.getResources().getDisplayMetrics().density;
+                  }
+
+                  @Override
+                  protected void onDraw(Canvas cv) {
+                      float w = getWidth(), h = getHeight();
+                      cv.drawColor(0xFF0C5D3B);
+                      float size = Math.min(0.32f * w, 170f * d);
+                      float s = size / 100f;
+                      float cx = w / 2f, cy = h / 2f;
+                      float ox = cx - size / 2f, oy = cy - size / 2f;
+                      p.setStyle(Paint.Style.STROKE);
+                      p.setStrokeWidth(1.2f * s);
+                      p.setColor(0xFFFFFFFF);
+                      p.setAlpha(71);
+                      cv.drawCircle(cx, cy, 48.5f * s, p);
+                      p.setAlpha(255);
+                      p.setStyle(Paint.Style.FILL);
+                      cv.drawCircle(cx, cy, 44f * s, p);
+                      p.setStyle(Paint.Style.STROKE);
+                      p.setStrokeWidth(8.5f * s);
+                      p.setStrokeCap(Paint.Cap.ROUND);
+                      p.setStrokeJoin(Paint.Join.ROUND);
+                      p.setColor(0xFF0C5D3B);
+                      Path m = new Path();
+                      m.moveTo(ox + 31f * s, oy + 67f * s);
+                      m.lineTo(ox + 31f * s, oy + 33f * s);
+                      m.lineTo(ox + 50f * s, oy + 54f * s);
+                      m.lineTo(ox + 69f * s, oy + 33f * s);
+                      m.lineTo(ox + 69f * s, oy + 67f * s);
+                      cv.drawPath(m, p);
+                      p.setStyle(Paint.Style.FILL);
+                      p.setColor(0xFFFFFFFF);
+                      p.setTypeface(Typeface.SANS_SERIF);
+                      float ts = Math.min(0.056f * w, 26f * d);
+                      p.setTextSize(ts);
+                      float sp = ts * 0.34f;
+                      String t = "MOUBARAK";
+                      float tot = sp * (t.length() - 1);
+                      for (int i = 0; i < t.length(); i++) tot += p.measureText(t.substring(i, i + 1));
+                      float x = (w - tot) / 2f;
+                      Paint.FontMetrics fm = p.getFontMetrics();
+                      float base = h * 0.8333f - (fm.ascent + fm.descent) / 2f;
+                      for (int i = 0; i < t.length(); i++) {
+                          String l = t.substring(i, i + 1);
+                          cv.drawText(l, x, base, p);
+                          x += p.measureText(l) + sp;
+                      }
+                  }
+              }
+          }
+          JAVA
       - name: Icone et écran de démarrage MOUBARAK
         run: |
           curl -fsSL https://khm.khelcom-moubarak.workers.dev/icon-512.png -o icon.png
@@ -73,8 +188,6 @@ jobs:
           for f in glob.glob(res + "drawable*/splash.png"):
               w, h = Image.open(f).size
               bg = Image.new("RGB", (w, h), "#0c5d3b")
-              k = min(w, h) // 3
-              bg.paste(leg.resize((k, k), Image.LANCZOS), ((w - k) // 2, (h - k) // 2))
               bg.save(f)
           PY
       - name: Synchroniser
@@ -86,6 +199,6 @@ jobs:
           ./gradlew assembleDebug
       - uses: actions/upload-artifact@v4
         with:
-          name: moubarak-apk-v5
+          name: moubarak-apk-v6
           path: android/app/build/outputs/apk/debug/app-debug.apk
           
